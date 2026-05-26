@@ -1,0 +1,28 @@
+services:
+  stock-strategy-tool:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MARKET_EXTRAS: ${MARKET_EXTRAS:-}
+    image: stock-strategy-tool:latest
+    container_name: stock-strategy-tool
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret-in-production}
+      DATABASE_URL: sqlite:////data/stock_strategy.db
+      CONFIG_FILE: /app/config.yaml
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
+      MARKET_DATA_PROVIDER: ${MARKET_DATA_PROVIDER:-demo}
+      TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
+      JQDATA_USERNAME: ${JQDATA_USERNAME:-}
+      JQDATA_PASSWORD: ${JQDATA_PASSWORD:-}
+      BOOTSTRAP_FIRST_USER_AS_ADMIN: ${BOOTSTRAP_FIRST_USER_AS_ADMIN:-true}
+    volumes:
+      - stock_strategy_data:/data
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+
+volumes:
+  stock_strategy_data:
