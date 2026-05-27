@@ -11,4 +11,4 @@ frontend/dist/
 config.yaml
 *.log
 run/
-frontend/package-lock.json
+# frontend/package-lock.json
