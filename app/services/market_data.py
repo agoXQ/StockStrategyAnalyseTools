@@ -190,6 +190,7 @@ class TushareMarketDataProvider(MarketDataProvider):
         self.tushare.set_token(token)
         self.pro = self.tushare.pro_api()
 
+
     def fetch_close(self, trade_date: date, symbol: str, market_type: str) -> MarketCloseData:
         provider_symbol = _index_alias(self.config, self.name, symbol) if market_type == DEFAULT_MARKET_TYPE_INDEX else _tushare_symbol(symbol, market_type)
         start = _date_yyyymmdd(trade_date)
