@@ -10,3 +10,5 @@ frontend/dist/
 *.db
 config.yaml
 *.log
+run/
+frontend/package-lock.json
