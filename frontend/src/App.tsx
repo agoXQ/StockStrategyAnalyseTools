@@ -312,12 +312,13 @@ function StockCard({
   type: "best" | "worst";
 }) {
   const color = type === "best" ? "positive" : "negative";
+  const displayValue = type === "best" ? stock.max_gain : stock.max_drawdown;
   return (
     <div className={`stock-card ${type}`}>
       <div className="stock-card-header">
         <span className={`stock-card-title ${color}`}>{title}</span>
         <span className={`stock-card-return ${color}`}>
-          {stock.current_return.toFixed(2)}%
+          {formatPercent(displayValue)}
         </span>
       </div>
       <div className="stock-card-body">
@@ -339,12 +340,14 @@ function StockCard({
         <div className="stock-card-row">
           <span className="label">最大回撤</span>
           <span className="value negative">
-            {stock.max_drawdown.toFixed(2)}%
+            {formatPercent(stock.max_drawdown)}
           </span>
         </div>
         <div className="stock-card-row">
           <span className="label">最大收益</span>
-          <span className="value positive">{stock.max_gain.toFixed(2)}%</span>
+          <span className="value positive">
+            {formatPercent(stock.max_gain)}
+          </span>
         </div>
       </div>
     </div>
