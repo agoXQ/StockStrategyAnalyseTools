@@ -9,3 +9,4 @@ frontend/dist/
 *.DB
 *.db
 tests/
+*.log
