@@ -1,4 +1,4 @@
-et -e  
+set -e
   
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"  
 RUN_DIR="$ROOT_DIR/run"  
