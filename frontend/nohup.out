@@ -1,0 +1,37 @@
+
+> stock-strategy-frontend@0.1.0 dev
+> vite --host 127.0.0.1 --host 0.0.0.0 --port 19198  
+
+1:29:58 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+
+  VITE v7.3.3  ready in 171 ms
+
+  ➜  Local:   http://localhost:19198/
+  ➜  Network: http://10.13.109.201:19198/
+
+> stock-strategy-frontend@0.1.0 dev
+> vite --host 127.0.0.1 --host 0.0.0.0 --port 19198  
+
+
+  VITE v7.3.3  ready in 128 ms
+
+  ➜  Local:   http://localhost:19198/
+  ➜  Network: http://10.13.109.201:19198/
+
+> stock-strategy-frontend@0.1.0 dev
+> vite --host 127.0.0.1 --host 0.0.0.0 --port 19198  
+
+
+  VITE v7.3.3  ready in 135 ms
+
+  ➜  Local:   http://localhost:19198/
+  ➜  Network: http://10.13.109.201:19198/
+
+> stock-strategy-frontend@0.1.0 dev
+> vite --host 127.0.0.1 --host 0.0.0.0 --port 19198  
+
+
+  VITE v7.3.3  ready in 141 ms
+
+  ➜  Local:   http://localhost:19198/
+  ➜  Network: http://10.13.109.201:19198/

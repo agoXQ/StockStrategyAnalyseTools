@@ -1,0 +1,31 @@
+market_data:
+  # 可选：demo / akshare / tushare / jqdata
+  provider: tushare
+
+  # 常用指数别名映射。可以按自己的前端/策略习惯继续扩展。
+  index_aliases:
+    CSI300:
+      akshare: "000300"
+      tushare: "000300.SH"
+      jqdata: "000300.XSHG"
+    SZ50:
+      akshare: "000016"
+      tushare: "000016.SH"
+      jqdata: "000016.XSHG"
+    SSE:
+      akshare: "000001"
+      tushare: "000001.SH"
+      jqdata: "000001.XSHG"
+
+  akshare:
+    # A 股历史行情复权参数："" / qfq / hfq
+    adjust: ""
+
+  tushare:
+    # 建议生产环境使用环境变量 TUSHARE_TOKEN，避免把 token 提交进仓库。
+    token: "084f2dbc34427cd02562dd52138878f282b50c8c0a8f396d4fd11fdb"
+
+  jqdata:
+    # 聚宽 jqdatasdk 账号。建议用环境变量 JQDATA_USERNAME / JQDATA_PASSWORD。
+    username: ""
+    password: ""
