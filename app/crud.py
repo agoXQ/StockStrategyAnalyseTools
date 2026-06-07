@@ -313,6 +313,50 @@ def list_app_logs(db: Session, skip: int = 0, limit: int = 50, level: Optional[s
         query = query.filter(models.AppLog.created_at <= datetime.combine(end, datetime.max.time()))
     return query.order_by(models.AppLog.created_at.desc()).offset(skip).limit(limit).all()
 
+
+def count_app_logs(db: Session, start: Optional[date] = None, end: Optional[date] = None) -> int:
+    query = db.query(models.AppLog)
+    if start is not None:
+        query = query.filter(models.AppLog.created_at >= datetime.combine(start, datetime.min.time()))
+    if end is not None:
+        query = query.filter(models.AppLog.created_at <= datetime.combine(end, datetime.max.time()))
+    return query.count()
+
+
+def delete_app_logs_before(db: Session, before_date: date) -> int:
+    """删除指定日期之前的应用日志"""
+    cutoff = datetime.combine(before_date, datetime.min.time())
+    deleted = db.query(models.AppLog).filter(
+        models.AppLog.created_at < cutoff
+    ).delete(synchronize_session=False)
+    db.commit()
+    return deleted
+
+
+def delete_sync_logs_before(db: Session, before_date: date) -> int:
+    """删除指定日期之前的同步日志"""
+    cutoff = datetime.combine(before_date, datetime.min.time())
+    deleted = db.query(models.SyncLog).filter(
+        models.SyncLog.created_at < cutoff
+    ).delete(synchronize_session=False)
+    db.commit()
+    return deleted
+
+
+def clean_old_logs(db: Session, retention_days: int = 7) -> dict:
+    """清理过期日志，返回清理统计"""
+    cutoff_date = date.today() - timedelta(days=retention_days)
+    
+    app_logs_deleted = delete_app_logs_before(db, cutoff_date)
+    sync_logs_deleted = delete_sync_logs_before(db, cutoff_date)
+    
+    return {
+        "app_logs_deleted": app_logs_deleted,
+        "sync_logs_deleted": sync_logs_deleted,
+        "cutoff_date": str(cutoff_date),
+        "total_deleted": app_logs_deleted + sync_logs_deleted,
+    }
+
 # Metrics helpers
 
 def get_strategy_metrics(db: Session, strategy_id: int, start: date, end: date) -> List[models.StrategyMetric]:

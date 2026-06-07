@@ -605,46 +605,90 @@ class MarketDataMaintenance:
         
         return len(logs) > 0
 
+    def _run_log_cleanup(self, retention_days: int = 7):
+        """执行日志清理"""
+        db = SessionLocal()
+        try:
+            result = crud.clean_old_logs(db, retention_days=retention_days)
+            logger.info(f"日志清理完成: 删除 {result['total_deleted']} 条日志 (截止: {result['cutoff_date']})")
+            self._log_to_db(
+                db, "info",
+                f"日志清理完成: 删除 {result['total_deleted']} 条日志",
+                {
+                    "app_logs_deleted": result["app_logs_deleted"],
+                    "sync_logs_deleted": result["sync_logs_deleted"],
+                    "cutoff_date": result["cutoff_date"],
+                    "retention_days": retention_days,
+                }
+            )
+        except Exception as e:
+            logger.error(f"日志清理异常: {e}")
+            self._log_to_db(db, "error", f"日志清理异常: {str(e)}", {"error": str(e)})
+        finally:
+            db.close()
+
     def _worker(self):
-        """后台工作线程：每天17点执行一次同步"""
+        """后台工作线程：每天17点执行一次同步，每天凌晨2点清理过期日志"""
         while not self._stop_event.is_set():
             now = datetime.now()
-            target_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
+            sync_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
+            cleanup_time = now.replace(hour=2, minute=0, second=0, microsecond=0)
             
-            # 计算到下一个17点的时间
-            if now >= target_time:
-                # 已经过了今天的17点，计算明天的17点
-                next_run = target_time + timedelta(days=1)
+            # 计算下一个执行时间（同步或清理）
+            next_events = []
+            
+            # 同步任务时间
+            if now >= sync_time:
+                next_sync = sync_time + timedelta(days=1)
             else:
-                # 还没到今天的17点
-                next_run = target_time
+                next_sync = sync_time
+            next_events.append(("sync", next_sync))
+            
+            # 日志清理时间
+            if now >= cleanup_time:
+                next_cleanup = cleanup_time + timedelta(days=1)
+            else:
+                next_cleanup = cleanup_time
+            next_events.append(("cleanup", next_cleanup))
+            
+            # 找出最近的事件
+            next_events.sort(key=lambda x: x[1])
+            event_type, next_run = next_events[0]
             
             wait_seconds = (next_run - now).total_seconds()
             
-            logger.info(f"下次同步时间: {next_run.isoformat()}, 等待 {wait_seconds/3600:.1f} 小时")
+            logger.info(f"下次任务: {event_type} at {next_run.isoformat()}, 等待 {wait_seconds/3600:.1f} 小时")
             self._stop_event.wait(wait_seconds)
             
             if self._stop_event.is_set():
                 break
             
-            # 执行同步前检查今天是否已经同步过
             db = SessionLocal()
             try:
-                if self._is_today_synced(db):
-                    logger.info("今天已经执行过同步任务，跳过")
-                    self._log_to_db(db, "info", "今天已经执行过同步任务，跳过自动同步")
+                if event_type == "sync":
+                    # 执行同步前检查今天是否已经同步过
+                    if self._is_today_synced(db):
+                        logger.info("今天已经执行过同步任务，跳过")
+                        self._log_to_db(db, "info", "今天已经执行过同步任务，跳过自动同步")
+                        db.close()
+                        continue
+                    
+                    logger.info("Starting daily market data maintenance at 17:00")
+                    self._log_to_db(db, "info", "每日17点自动同步开始执行")
                     db.close()
-                    continue
-                
-                logger.info("Starting daily market data maintenance at 17:00")
-                self._log_to_db(db, "info", "每日17点自动同步开始执行")
-                db.close()
-                
-                self.run_full_sync()
+                    
+                    self.run_full_sync()
+                elif event_type == "cleanup":
+                    # 清理过期日志
+                    logger.info("Starting log cleanup at 02:00")
+                    self._log_to_db(db, "info", "每日2点自动清理过期日志开始执行")
+                    db.close()
+                    
+                    self._run_log_cleanup()
             except Exception as e:
                 logger.error(f"Maintenance worker error: {e}")
                 self._last_error = str(e)
-                self._log_to_db(db, "error", f"每日自动同步异常: {str(e)}")
+                self._log_to_db(db, "error", f"定时任务异常: {str(e)}")
                 db.close()
 
     def start(self, run_immediately: bool = True):

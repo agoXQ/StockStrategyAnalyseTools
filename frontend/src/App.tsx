@@ -15,6 +15,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Circle,
+  Clock,
   DatabaseZap,
   Layers,
   LineChart as LineChartIcon,
@@ -388,6 +389,7 @@ function App() {
   const [manualSyncStartDate, setManualSyncStartDate] = useState<string>("");
   const [manualSyncEndDate, setManualSyncEndDate] = useState<string>("");
   const [batchApiSyncDate, setBatchApiSyncDate] = useState<string>("");
+  const [logRetentionDays, setLogRetentionDays] = useState<number>(7);
 
   const [strategyOverview, setStrategyOverview] =
     useState<StrategyOverview | null>(null);
@@ -869,6 +871,19 @@ function App() {
           `批量接口同步失败: ${result.errors?.join(", ") || result.error}`,
         );
       }
+      await loadMaintenanceData();
+      await loadSyncLogs();
+    });
+  }
+
+  async function cleanOldLogs() {
+    if (!token) return;
+    await guarded(async () => {
+      setMessage(`正在清理 ${logRetentionDays} 天前的日志...`);
+      const result = await api.cleanOldLogs(token, logRetentionDays);
+      setMessage(
+        `日志清理完成: 共删除 ${result.total_deleted} 条日志 (应用日志: ${result.app_logs_deleted}, 同步日志: ${result.sync_logs_deleted})`,
+      );
       await loadMaintenanceData();
       await loadSyncLogs();
     });
@@ -2187,6 +2202,50 @@ function App() {
                   </button>
                 </div>
               </div>
+
+              <div className="panel" style={{ marginTop: "16px" }}>
+                <div className="panel-head">
+                  <h3>日志清理</h3>
+                  <Clock size={17} />
+                </div>
+                <div className="service-status">
+                  <div className="status-info">
+                    <p>
+                      自动清理：系统每天凌晨2点自动清理过期日志，默认保留7天。
+                    </p>
+                    <p className="text-muted">
+                      你也可以手动清理指定天数之前的日志。
+                    </p>
+                  </div>
+                  <div className="date-range-inputs">
+                    <div className="date-input-group">
+                      <label htmlFor="log-retention-days">保留天数</label>
+                      <input
+                        id="log-retention-days"
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={logRetentionDays}
+                        onChange={(e) =>
+                          setLogRetentionDays(parseInt(e.target.value) || 7)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <button
+                    className="primary-button"
+                    onClick={cleanOldLogs}
+                    disabled={loading}
+                    type="button"
+                  >
+                    {loading ?
+                      <Loader2 className="spin" size={16} />
+                    : <Clock size={16} />}
+                    手动清理日志
+                  </button>
+                </div>
+              </div>
+
               <div className="table-wrap">
                 <table>
                   <thead>

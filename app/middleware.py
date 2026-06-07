@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Callable
 
 from fastapi import Request, Response
@@ -6,7 +7,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from app.crud import log_error
+from app.crud import log_error, log_info, log_warning
 from app.database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -14,39 +15,63 @@ logger = logging.getLogger(__name__)
 
 class DatabaseLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        start_time = time.time()
         response = None
         error_occurred = False
         error_detail = None
 
+        # 跳过静态资源和文档页面的日志记录
+        skip_paths = ["/docs", "/openapi.json", "/favicon.ico"]
+        should_skip_logging = any(request.url.path.startswith(p) for p in skip_paths)
+
         try:
             response = await call_next(request)
-            if response.status_code == 404 and not request.url.path.startswith("/docs") and not request.url.path.startswith("/openapi"):
-                try:
-                    db = SessionLocal()
-                    try:
-                        log_error(
-                            db,
-                            message=f"404: {request.method} {request.url.path}",
-                            category="api",
-                            source="middleware",
-                            details={
-                                "method": request.method,
-                                "path": request.url.path,
-                                "query_params": str(request.url.query),
-                                "status_code": 404,
-                            },
-                        )
-                    except Exception as log_exc:
-                        logger.error(f"Failed to log 404 to database: {log_exc}")
-                    finally:
-                        db.close()
-                except Exception:
-                    pass
+            process_time = time.time() - start_time
+
+            if should_skip_logging:
+                return response
+
+            # 记录请求日志
+            log_level = "info"
+            if response.status_code >= 500:
+                log_level = "error"
+            elif response.status_code >= 400:
+                log_level = "warning"
+
+            log_message = f"{request.method} {request.url.path} - {response.status_code} ({process_time:.3f}s)"
+            
+            db = SessionLocal()
+            try:
+                log_func = {
+                    "info": log_info,
+                    "warning": log_warning,
+                    "error": log_error,
+                }.get(log_level, log_info)
+                
+                log_func(
+                    db,
+                    message=log_message,
+                    category="api",
+                    source="middleware",
+                    details={
+                        "method": request.method,
+                        "path": request.url.path,
+                        "query_params": str(request.url.query) if request.url.query else None,
+                        "status_code": response.status_code,
+                        "process_time": round(process_time, 3),
+                    },
+                )
+            except Exception as log_exc:
+                logger.error(f"Failed to log request to database: {log_exc}")
+            finally:
+                db.close()
+
             return response
         except Exception as exc:
             error_occurred = True
             error_detail = self._get_error_detail(exc)
             tb = self._format_traceback(exc)
+            process_time = time.time() - start_time
 
             logger.error(f"Unhandled exception: {exc}\n{tb}")
 
@@ -54,7 +79,7 @@ class DatabaseLoggingMiddleware(BaseHTTPMiddleware):
             try:
                 log_error(
                     db,
-                    message=f"API异常: {request.method} {request.url.path}",
+                    message=f"API异常: {request.method} {request.url.path} ({process_time:.3f}s)",
                     category="api",
                     source="middleware",
                     details={
@@ -64,6 +89,7 @@ class DatabaseLoggingMiddleware(BaseHTTPMiddleware):
                         "error_type": type(exc).__name__,
                         "error_message": str(exc),
                         "traceback": tb,
+                        "process_time": round(process_time, 3),
                     },
                 )
             except Exception as log_exc:

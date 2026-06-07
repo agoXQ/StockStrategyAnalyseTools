@@ -413,4 +413,11 @@ export const api = {
       body: payload || undefined,
     });
   },
+  cleanOldLogs(token: string, retention_days?: number) {
+    return request<any>("/api/maintenance/logs/clean", {
+      method: "POST",
+      token,
+      body: retention_days ? { retention_days } : undefined,
+    });
+  },
 };

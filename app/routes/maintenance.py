@@ -271,3 +271,30 @@ def get_all_logs(
 
     results.sort(key=lambda x: x.created_at, reverse=True)
     return results[:limit]
+
+
+class LogCleanupRequest(BaseModel):
+    retention_days: int = 7
+
+
+class LogCleanupResponse(BaseModel):
+    app_logs_deleted: int
+    sync_logs_deleted: int
+    total_deleted: int
+    cutoff_date: str
+
+
+@router.post("/logs/clean", response_model=LogCleanupResponse)
+def clean_old_logs_endpoint(
+    payload: Optional[LogCleanupRequest] = None,
+    current_user=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """清理过期日志，默认保留7天"""
+    retention_days = payload.retention_days if payload else 7
+    
+    try:
+        result = crud.clean_old_logs(db, retention_days=retention_days)
+        return LogCleanupResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
