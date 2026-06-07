@@ -9,7 +9,12 @@ mkdir -p "$LOG_DIR" "$RUN_DIR"
   
 echo "Starting backend..."  
 cd "$ROOT_DIR"  
-  
+
+# Clean Python cache
+echo "Cleaning Python cache..."
+find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.pyc" -delete 2>/dev/null || true
+
 if [ ! -d ".venv" ]; then  
   python3 -m venv .venv  
 fi  
@@ -38,4 +43,3 @@ lsof -i:19198 || true
 EOF  
   
 chmod +x start.sh
-
