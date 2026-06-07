@@ -488,18 +488,25 @@ def get_strategy_stock_performance(db: Session, strategy_id: int) -> Tuple[List[
 
         current_return = (current_price / entry_price - 1) * 100
 
-        lowest_price = entry_price
-        highest_price = entry_price
+        peak_price = entry_price
+        max_drawdown_pct = 0.0
+        max_gain_pct = 0.0
 
         for row in price_rows:
             if row.trade_date < entry_row.trade_date:
                 continue
             price = float(row.close_price)
-            lowest_price = min(lowest_price, price)
-            highest_price = max(highest_price, price)
+            
+            current_gain = (price / entry_price - 1) * 100
+            max_gain_pct = max(max_gain_pct, current_gain)
+            
+            peak_price = max(peak_price, price)
+            if peak_price > 0:
+                drawdown = (price / peak_price - 1) * 100
+                max_drawdown_pct = min(max_drawdown_pct, drawdown)
 
-        max_drawdown = (lowest_price / entry_price - 1) * 100
-        max_gain = (highest_price / entry_price - 1) * 100
+        max_drawdown = max_drawdown_pct
+        max_gain = max_gain_pct
 
         performances.append({
             "stock_code": stock_code,
@@ -573,18 +580,25 @@ def get_batch_stocks_performance(db: Session, batch_id: int) -> List[dict]:
                 if added_close_price and added_close_price > 0:
                     current_return = (current_price / added_close_price - 1) * 100
 
-                    lowest_price = added_close_price
-                    highest_price = added_close_price
+                    peak_price = added_close_price
+                    max_drawdown_pct = 0.0
+                    max_gain_pct = 0.0
 
                     for row in price_rows:
                         if row.trade_date < entry_row.trade_date:
                             continue
                         price = float(row.close_price)
-                        lowest_price = min(lowest_price, price)
-                        highest_price = max(highest_price, price)
+                        
+                        current_gain = (price / added_close_price - 1) * 100
+                        max_gain_pct = max(max_gain_pct, current_gain)
+                        
+                        peak_price = max(peak_price, price)
+                        if peak_price > 0:
+                            drawdown = (price / peak_price - 1) * 100
+                            max_drawdown_pct = min(max_drawdown_pct, drawdown)
 
-                    max_drawdown = (lowest_price / added_close_price - 1) * 100
-                    max_gain = (highest_price / added_close_price - 1) * 100
+                    max_drawdown = max_drawdown_pct
+                    max_gain = max_gain_pct
                 else:
                     current_return = 0.0
                     max_drawdown = 0.0
@@ -665,25 +679,31 @@ def get_stock_detail(db: Session, batch_id: int, stock_id: int) -> Optional[dict
             if added_close_price and added_close_price > 0:
                 current_return = (current_price / added_close_price - 1) * 100
 
-                lowest_price = added_close_price
-                highest_price = added_close_price
+                peak_price = added_close_price
+                max_drawdown_pct = 0.0
+                max_gain_pct = 0.0
 
                 return_history = []
                 for row in price_rows:
                     if row.trade_date < entry_row.trade_date:
                         continue
                     price = float(row.close_price)
-                    lowest_price = min(lowest_price, price)
-                    highest_price = max(highest_price, price)
                     
                     daily_return = (price / added_close_price - 1) * 100
+                    max_gain_pct = max(max_gain_pct, daily_return)
+                    
+                    peak_price = max(peak_price, price)
+                    if peak_price > 0:
+                        drawdown = (price / peak_price - 1) * 100
+                        max_drawdown_pct = min(max_drawdown_pct, drawdown)
+                    
                     return_history.append({
                         "date": row.trade_date.isoformat(),
                         "return": daily_return / 100  # 转换为小数
                     })
 
-                max_drawdown = (lowest_price / added_close_price - 1) * 100
-                max_gain = (highest_price / added_close_price - 1) * 100
+                max_drawdown = max_drawdown_pct
+                max_gain = max_gain_pct
             else:
                 current_return = 0.0
                 max_drawdown = 0.0

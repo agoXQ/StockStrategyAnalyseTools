@@ -230,18 +230,6 @@ class HoldReturnResponse(BaseModel):
     hold_return: Optional[float]
     status: str
 
-class BatchComparisonItem(BaseModel):
-    batch_id: int
-    batch_name: str
-    total_return: float
-    max_drawdown: float
-    max_gain: float
-
-class BatchComparisonResponse(BaseModel):
-    strategy_id: int
-    trade_date: Optional[date]
-    batch_comparison: List[BatchComparisonItem]
-
 class BatchStockPerformance(BaseModel):
     id: int
     stock_code: str

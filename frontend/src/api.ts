@@ -304,12 +304,6 @@ export const api = {
       { token },
     );
   },
-  compareBatches(token: string, strategyId: number) {
-    return request<BatchComparisonResponse>(
-      `/api/strategies/${strategyId}/compare-batches`,
-      { token },
-    );
-  },
   getMaintenanceStatus(token: string) {
     return request<MaintenanceStatus>("/api/maintenance/status", { token });
   },
@@ -400,6 +394,23 @@ export const api = {
     return request<{ status: string }>("/api/maintenance/stop", {
       method: "POST",
       token,
+    });
+  },
+  runBatchApiSync(token: string, trade_date: string) {
+    return request<any>("/api/maintenance/run-batch-api-sync", {
+      method: "POST",
+      token,
+      body: { trade_date },
+    });
+  },
+  runFullSync(
+    token: string,
+    payload?: { start_date?: string; end_date?: string },
+  ) {
+    return request<any>("/api/maintenance/run-full-sync", {
+      method: "POST",
+      token,
+      body: payload || undefined,
     });
   },
 };

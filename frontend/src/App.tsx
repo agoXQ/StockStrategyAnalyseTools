@@ -35,7 +35,6 @@ import type {
   AppLog,
   AnyLog,
   Batch,
-  BatchComparisonResponse,
   BatchDetail,
   BatchStock,
   BatchStockPerformance,
@@ -139,7 +138,7 @@ function StockCard({
       <div className="stock-card-header">
         <span className={`stock-card-title ${color}`}>{title}</span>
         <span className={`stock-card-return ${color}`}>
-          {stock.current_return.toFixed(2)}%
+          {(stock.current_return * 100).toFixed(2)}%
         </span>
       </div>
       <div className="stock-card-body">
@@ -161,12 +160,14 @@ function StockCard({
         <div className="stock-card-row">
           <span className="label">最大回撤</span>
           <span className="value negative">
-            {stock.max_drawdown.toFixed(2)}%
+            {(stock.max_drawdown * 100).toFixed(2)}%
           </span>
         </div>
         <div className="stock-card-row">
           <span className="label">最大收益</span>
-          <span className="value positive">{stock.max_gain.toFixed(2)}%</span>
+          <span className="value positive">
+            {(stock.max_gain * 100).toFixed(2)}%
+          </span>
         </div>
       </div>
     </div>
@@ -342,9 +343,6 @@ function App() {
     useState<MetricsResponse | null>(null);
   const [selectedBatchMetrics, setSelectedBatchMetrics] =
     useState<MetricsResponse | null>(null);
-  const [comparison, setComparison] = useState<BatchComparisonResponse | null>(
-    null,
-  );
   const [holdReturn, setHoldReturn] = useState<HoldReturnResponse | null>(null);
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -387,6 +385,10 @@ function App() {
   const [logPage, setLogPage] = useState(1);
   const [logTotal, setLogTotal] = useState(0);
 
+  const [manualSyncStartDate, setManualSyncStartDate] = useState<string>("");
+  const [manualSyncEndDate, setManualSyncEndDate] = useState<string>("");
+  const [batchApiSyncDate, setBatchApiSyncDate] = useState<string>("");
+
   const [strategyOverview, setStrategyOverview] =
     useState<StrategyOverview | null>(null);
   const [winRateHistory, setWinRateHistory] = useState<WinRateHistory | null>(
@@ -420,13 +422,6 @@ function App() {
     () => batches.find((batch) => batch.id === selectedBatchId) || null,
     [batches, selectedBatchId],
   );
-
-  const comparisonData =
-    comparison?.batch_comparison.map((item) => ({
-      name: item.batch_name,
-      return: Number((item.total_return * 100).toFixed(2)),
-      drawdown: Number((item.max_drawdown * 100).toFixed(2)),
-    })) || [];
 
   function logout() {
     localStorage.removeItem("stock_strategy_token");
@@ -492,7 +487,6 @@ function App() {
       metricStart,
       metricEnd,
     );
-    const compared = await api.compareBatches(token, strategyId);
     const batchMetricEntries = await Promise.all(
       loadedBatches.map(async (batch) => {
         const metric = await api.getBatchMetrics(
@@ -514,7 +508,6 @@ function App() {
     updateChartData(overview, winHistory, "winrate");
 
     setStrategyMetrics(strategyMetric);
-    setComparison(compared);
     setBatchMetrics(Object.fromEntries(batchMetricEntries));
   }
 
@@ -831,6 +824,54 @@ function App() {
         await loadMaintenanceData();
       });
     }
+  }
+
+  async function runManualFullSync() {
+    if (!token) return;
+    await guarded(async () => {
+      const payload: any = {};
+      if (manualSyncStartDate) payload.start_date = manualSyncStartDate;
+      if (manualSyncEndDate) payload.end_date = manualSyncEndDate;
+
+      const dateRange =
+        manualSyncStartDate && manualSyncEndDate ?
+          ` (${manualSyncStartDate} ~ ${manualSyncEndDate})`
+        : manualSyncStartDate ? ` (从 ${manualSyncStartDate})`
+        : manualSyncEndDate ? ` (到 ${manualSyncEndDate})`
+        : "";
+
+      setMessage(`正在执行手动批量同步${dateRange}...`);
+      const result = await api.runFullSync(token, payload);
+      if (result.success) {
+        setMessage(
+          `手动批量同步完成: ${result.success_count} 条数据成功, ${result.fail_count} 条失败`,
+        );
+      } else {
+        setMessage(`手动批量同步失败: ${result.errors?.join(", ")}`);
+      }
+      await loadMaintenanceData();
+      await loadSyncLogs();
+    });
+  }
+
+  async function runBatchApiSync() {
+    if (!token || !batchApiSyncDate) {
+      setMessage("请选择同步日期");
+      return;
+    }
+    await guarded(async () => {
+      setMessage(`正在执行批量接口同步 ${batchApiSyncDate}...`);
+      const result = await api.runBatchApiSync(token, batchApiSyncDate);
+      if (result.success) {
+        setMessage(`批量接口同步完成: ${result.success_count} 条数据`);
+      } else {
+        setMessage(
+          `批量接口同步失败: ${result.errors?.join(", ") || result.error}`,
+        );
+      }
+      await loadMaintenanceData();
+      await loadSyncLogs();
+    });
   }
 
   if (!token || !user) {
@@ -1420,7 +1461,7 @@ function App() {
                     <div style={{ fontSize: "14px", color: "#666" }}>
                       {strategyOverview.best_stock.stock_name} (
                       {strategyOverview.best_stock.stock_code}) - 最大收益{" "}
-                      {strategyOverview.best_stock.current_return.toFixed(2)}%
+                      {(strategyOverview.best_stock.max_gain * 100).toFixed(2)}%
                     </div>
                     {klineLoading ?
                       <div>加载中...</div>
@@ -1446,7 +1487,10 @@ function App() {
                     <div style={{ fontSize: "14px", color: "#666" }}>
                       {strategyOverview.worst_stock.stock_name} (
                       {strategyOverview.worst_stock.stock_code}) - 最大亏损{" "}
-                      {strategyOverview.worst_stock.current_return.toFixed(2)}%
+                      {(
+                        strategyOverview.worst_stock.max_drawdown * 100
+                      ).toFixed(2)}
+                      %
                     </div>
                     {klineLoading ?
                       <div>加载中...</div>
@@ -1957,6 +2001,85 @@ function App() {
                     <Loader2 className="spin" size={16} />
                   : null}
                   {maintenanceStatus?.is_running ? "停止同步" : "启动同步"}
+                </button>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-head">
+                <h3>手动同步</h3>
+                <DatabaseZap size={17} />
+              </div>
+              <div className="service-status">
+                <div className="status-info">
+                  <h4>方式一：批量接口同步</h4>
+                  <p>调用 Tushare daily 批量接口获取指定日期的所有股票数据。</p>
+                  <p className="text-muted">
+                    注意：该接口每天限用5次，请谨慎使用。
+                  </p>
+                </div>
+                <div className="date-range-inputs">
+                  <div className="date-input-group">
+                    <label htmlFor="batch-api-sync-date">同步日期</label>
+                    <input
+                      id="batch-api-sync-date"
+                      type="date"
+                      value={batchApiSyncDate}
+                      onChange={(e) => setBatchApiSyncDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <button
+                  className="primary-button"
+                  onClick={runBatchApiSync}
+                  disabled={loading || !batchApiSyncDate}
+                  type="button"
+                >
+                  {loading ?
+                    <Loader2 className="spin" size={16} />
+                  : <DatabaseZap size={16} />}
+                  执行批量接口同步
+                </button>
+
+                <div className="status-info" style={{ marginTop: "24px" }}>
+                  <h4>方式二：增量同步</h4>
+                  <p>
+                    按个股逐个同步缺失的交易日数据，与后台自动同步逻辑一致。
+                  </p>
+                  <p className="text-muted">
+                    如果不选择日期，将同步所有批次股票的全部缺失数据。
+                  </p>
+                </div>
+                <div className="date-range-inputs">
+                  <div className="date-input-group">
+                    <label htmlFor="manual-sync-start">开始日期</label>
+                    <input
+                      id="manual-sync-start"
+                      type="date"
+                      value={manualSyncStartDate}
+                      onChange={(e) => setManualSyncStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="date-input-group">
+                    <label htmlFor="manual-sync-end">结束日期</label>
+                    <input
+                      id="manual-sync-end"
+                      type="date"
+                      value={manualSyncEndDate}
+                      onChange={(e) => setManualSyncEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <button
+                  className="primary-button"
+                  onClick={runManualFullSync}
+                  disabled={loading}
+                  type="button"
+                >
+                  {loading ?
+                    <Loader2 className="spin" size={16} />
+                  : <DatabaseZap size={16} />}
+                  执行增量同步
                 </button>
               </div>
             </div>

@@ -90,9 +90,10 @@ def get_strategy_overview(strategy_id: int, db: Session = Depends(get_db), curre
             max_gain=0.0,
         )
 
-    performances_sorted = sorted(performances, key=lambda x: x["current_return"], reverse=True)
-    best = performances_sorted[0]
-    worst = performances_sorted[-1]
+    performances_sorted_by_gain = sorted(performances, key=lambda x: x["max_gain"], reverse=True)
+    performances_sorted_by_drawdown = sorted(performances, key=lambda x: x["max_drawdown"])
+    best = performances_sorted_by_gain[0]
+    worst = performances_sorted_by_drawdown[0]
 
     total = len(performances)
     profitable = sum(1 for p in performances if p["is_profitable"])

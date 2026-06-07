@@ -116,6 +116,72 @@ def run_maintenance_once(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+class BatchApiSyncRequest(BaseModel):
+    trade_date: date
+
+
+class ManualSyncRequest(BaseModel):
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+
+@router.post("/run-batch-api-sync")
+def run_batch_api_sync(
+    payload: BatchApiSyncRequest,
+    current_user=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """批量接口同步：调用 Tushare daily 批量接口获取指定日期的所有股票数据"""
+    service = get_maintenance_service()
+    if service is None:
+        service = start_maintenance_service()
+
+    try:
+        result = service.run_batch_api_sync(db, trade_date=payload.trade_date)
+        return {
+            "success": result["success"],
+            "start_time": result["start_time"],
+            "end_time": result["end_time"],
+            "trade_date": result["trade_date"],
+            "success_count": result["success_count"],
+            "fail_count": result["fail_count"],
+            "errors": result["errors"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post("/run-full-sync")
+def run_manual_full_sync(
+    payload: Optional[ManualSyncRequest] = None,
+    current_user=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """手动批量同步：按指定日期范围批量获取股票数据"""
+    service = get_maintenance_service()
+    if service is None:
+        service = start_maintenance_service()
+
+    try:
+        result = service.run_manual_full_sync(
+            db,
+            start_date=payload.start_date if payload else None,
+            end_date=payload.end_date if payload else None,
+        )
+        return {
+            "success": result["success"],
+            "start_time": result["start_time"],
+            "end_time": result["end_time"],
+            "start_date": result["start_date"],
+            "end_date": result["end_date"],
+            "success_count": result["success_count"],
+            "fail_count": result["fail_count"],
+            "errors": result["errors"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/logs/sync", response_model=List[SyncHistoryItem])
 def get_sync_logs(
     start: Optional[date] = None,

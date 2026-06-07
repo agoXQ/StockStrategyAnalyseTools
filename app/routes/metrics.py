@@ -7,8 +7,6 @@ from sqlalchemy.orm import Session
 from app import crud, models
 from app.deps import get_current_user, get_db
 from app.schemas import (
-    BatchComparisonItem,
-    BatchComparisonResponse,
     HoldReturnResponse,
     MetricsPoint,
     MetricsResponse,
@@ -149,35 +147,3 @@ def hold_return(n: int, k: int, scope: str, id: int, db: Session = Depends(get_d
         hold_return=value,
         status="completed" if value is not None else "insufficient_data",
     )
-
-
-@router.get("/strategies/{strategy_id}/compare-batches", response_model=BatchComparisonResponse)
-def compare_batches(strategy_id: int, trade_date: Optional[date] = None, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    strategy = crud.get_strategy(db, strategy_id=strategy_id)
-    if not strategy:
-        raise HTTPException(status_code=404, detail="Strategy not found")
-    if current_user.role == "user" and strategy.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    comparison = []
-    for batch in strategy.batches:
-        query = db.query(models.StrategyMetric).filter(
-            models.StrategyMetric.batch_id == batch.id,
-            models.StrategyMetric.stock_code.is_(None),
-        )
-        if trade_date:
-            query = query.filter(models.StrategyMetric.metric_date == trade_date)
-        metric = query.order_by(models.StrategyMetric.metric_date.desc()).first()
-        if not metric:
-            continue
-        comparison.append(
-            BatchComparisonItem(
-                batch_id=batch.id,
-                batch_name=batch.name,
-                total_return=float(metric.cumulative_return or 0.0),
-                max_drawdown=float(metric.max_drawdown or 0.0),
-                max_gain=float(metric.max_gain or 0.0),
-            )
-        )
-
-    return BatchComparisonResponse(strategy_id=strategy_id, trade_date=trade_date, batch_comparison=comparison)
